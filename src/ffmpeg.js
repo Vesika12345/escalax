@@ -22,7 +22,7 @@ const WM_POSITIONS = {
 
 function processVideo({ inputVideo, logoPath, watermarkPath, template, outputPath, onProgress }) {
   return new Promise((resolve, reject) => {
-    const cmd = ffmpeg(inputVideo);
+    const cmd = ffmpeg(inputVideo).inputOptions(["-threads", "1"]);
 
     let nextInputIndex = 1;
     let logoIdx = null;
@@ -135,7 +135,17 @@ function processVideo({ inputVideo, logoPath, watermarkPath, template, outputPat
 
     cmd
       .complexFilter(filters, current)
-      .outputOptions(["-map 0:a?", "-c:v libx264", "-preset veryfast", "-crf 22", "-c:a aac", "-movflags +faststart"])
+      .outputOptions([
+        "-map 0:a?",
+        "-c:v libx264",
+        "-preset ultrafast",
+        "-threads 1",
+        "-crf 24",
+        "-r 30",
+        "-c:a aac",
+        "-b:a 96k",
+        "-movflags +faststart",
+      ])
       .on("progress", (p) => onProgress && onProgress(p.percent || 0))
       .on("error", reject)
       .on("end", resolve)
