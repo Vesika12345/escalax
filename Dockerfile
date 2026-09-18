@@ -1,4 +1,4 @@
-FROM node:20-bullseye-slim
+FROM node:20-bookworm-slim
 
 # FFmpeg + fontes usadas no overlay de texto (nome, @, título)
 RUN apt-get update && \
