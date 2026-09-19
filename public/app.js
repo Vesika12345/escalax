@@ -8,6 +8,7 @@ const $ = (id) => document.getElementById(id);
 const list = $("list");
 
 function addFiles(fileList) {
+  const wasEmpty = state.files.length === 0;
   [...fileList].forEach((file) => {
     const id = crypto.randomUUID();
     const el = document.createElement("div");
@@ -21,6 +22,9 @@ function addFiles(fileList) {
     state.files.push({ id, file, el, status: "waiting", percent: 0 });
   });
   $("processBtn").disabled = state.files.length === 0;
+  if (wasEmpty && state.files.length) {
+    setPreviewVideo(state.files[0].file);
+  }
 }
 
 $("videoFiles").addEventListener("change", (e) => addFiles(e.target.files));
@@ -99,6 +103,9 @@ function currentTemplate() {
     videoBoxAspect: $("videoBoxAspect").value,
     verified: $("verified").checked,
     verifiedColor: $("verifiedColor").value,
+    zoomScale: parseFloat($("zoomScale").value),
+    centerOffsetY: parseFloat($("centerOffsetY").value),
+    topMargin: parseFloat($("topMargin").value),
     watermark: {
       enabled: $("wmEnabled").checked,
       position: $("wmPosition").value,
@@ -106,6 +113,183 @@ function currentTemplate() {
     },
   };
 }
+
+// ---------------- Preview (canvas) ----------------
+const CW = 1080, CH = 1920;
+const previewCanvas = $("previewCanvas");
+const pctx = previewCanvas.getContext("2d");
+const previewVideo = $("previewVideo");
+const scaleF = previewCanvas.width / CW;
+let avatarImg = null;
+let rafId = null;
+
+const BG_HEX = { black: "#000000", white: "#ffffff", dim: "#15202b" };
+const BADGE_HEX = { blue: "#1d9bf0", gold: "#ffd700", silver: "#829aab" };
+
+function setPreviewVideo(file) {
+  const url = URL.createObjectURL(file);
+  previewVideo.src = url;
+  previewVideo.play().catch(() => {});
+  if (!rafId) loopDraw();
+}
+
+$("logoFile").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (!f) { avatarImg = null; scheduleDraw(); return; }
+  const img = new Image();
+  img.onload = () => { avatarImg = img; scheduleDraw(); };
+  img.src = URL.createObjectURL(f);
+});
+
+function wrapLinesPreview(text, maxWidth, fontSize) {
+  pctx.font = `bold ${fontSize}px sans-serif`;
+  const words = String(text || "").split(/\s+/).filter(Boolean);
+  const lines = [];
+  let cur = "";
+  for (const w of words) {
+    const test = cur ? cur + " " + w : w;
+    if (pctx.measureText(test).width > maxWidth && cur) {
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [""];
+}
+
+function drawPreview() {
+  const tpl = currentTemplate();
+  const isLight = tpl.pageBackground === "white";
+  const primary = isLight ? "#0f1419" : "#f7f9f9";
+  const secondary = isLight ? "#536471" : "#71767b";
+
+  pctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+  pctx.fillStyle = BG_HEX[tpl.pageBackground] || "#000";
+  pctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+
+  const cardWidth = Math.round(CW * 0.92);
+  const cardX = Math.round((CW - cardWidth) / 2);
+  let currentY = tpl.topMargin || 130;
+  const showHeader = tpl.overlayText;
+  const avatarSize = 74;
+  const hasAvatar = !!avatarImg;
+  const infoX = hasAvatar ? cardX + avatarSize + 20 : cardX;
+  const nameFontSize = 30, handleFontSize = 24, titleFontSize = 36;
+  let headerTop = currentY, nameY = currentY + 4, handleY = currentY + 42;
+  let titleLines = [], titleY = 0;
+  const lineHeight = Math.round(titleFontSize * 1.38);
+
+  if (showHeader) {
+    currentY += avatarSize + 24;
+    if (tpl.title) {
+      titleLines = wrapLinesPreview(tpl.title, cardWidth, titleFontSize);
+      titleY = currentY;
+      currentY += titleLines.length * lineHeight + 24;
+    }
+  } else {
+    currentY = 0;
+  }
+
+  const videoBoxX = showHeader ? cardX : 0;
+  const videoBoxY = showHeader ? currentY : 0;
+  const videoBoxW = showHeader ? cardWidth : CW;
+  let videoBoxH;
+  if (!showHeader) videoBoxH = CH;
+  else if (tpl.videoBoxAspect === "16:9") videoBoxH = Math.round(cardWidth * (9 / 16));
+  else if (tpl.videoBoxAspect === "4:5") videoBoxH = Math.round(cardWidth * (5 / 4));
+  else videoBoxH = cardWidth;
+
+  if (previewVideo.videoWidth) {
+    const zoom = Math.min(1.8, Math.max(1, tpl.zoomScale || 1));
+    const scaledW = videoBoxW * zoom, scaledH = videoBoxH * zoom;
+    const s = Math.max(scaledW / previewVideo.videoWidth, scaledH / previewVideo.videoHeight);
+    const svW = previewVideo.videoWidth * s, svH = previewVideo.videoHeight * s;
+    const maxOffset = (svH - videoBoxH) / 2;
+    const offsetY = Math.max(-maxOffset, Math.min(maxOffset, tpl.centerOffsetY || 0));
+    const cropY = maxOffset + offsetY;
+    const cropX = (svW - videoBoxW) / 2;
+    const sx = cropX / s, sy = cropY / s, sw = videoBoxW / s, sh = videoBoxH / s;
+    pctx.drawImage(
+      previewVideo, sx, sy, sw, sh,
+      videoBoxX * scaleF, videoBoxY * scaleF, videoBoxW * scaleF, videoBoxH * scaleF
+    );
+  } else {
+    pctx.fillStyle = "#111";
+    pctx.fillRect(videoBoxX * scaleF, videoBoxY * scaleF, videoBoxW * scaleF, videoBoxH * scaleF);
+  }
+
+  if (showHeader) {
+    if (hasAvatar) {
+      pctx.save();
+      pctx.beginPath();
+      pctx.arc((cardX + avatarSize / 2) * scaleF, (headerTop + avatarSize / 2) * scaleF, (avatarSize / 2) * scaleF, 0, Math.PI * 2);
+      pctx.clip();
+      pctx.drawImage(avatarImg, cardX * scaleF, headerTop * scaleF, avatarSize * scaleF, avatarSize * scaleF);
+      pctx.restore();
+    }
+
+    if (tpl.name) {
+      pctx.textBaseline = "top";
+      pctx.font = `bold ${nameFontSize * scaleF}px sans-serif`;
+      pctx.fillStyle = primary;
+      pctx.fillText(tpl.name, infoX * scaleF, nameY * scaleF);
+
+      if (tpl.verified) {
+        const nameW = pctx.measureText(tpl.name).width;
+        const bx = infoX * scaleF + nameW + 8 * scaleF;
+        const by = nameY * scaleF + 13 * scaleF;
+        const r = 13 * scaleF;
+        pctx.beginPath();
+        pctx.arc(bx + r, by, r, 0, Math.PI * 2);
+        pctx.fillStyle = BADGE_HEX[tpl.verifiedColor] || BADGE_HEX.blue;
+        pctx.fill();
+        pctx.strokeStyle = "#fff";
+        pctx.lineWidth = Math.max(1, 2.2 * scaleF);
+        pctx.lineCap = "round";
+        pctx.lineJoin = "round";
+        pctx.beginPath();
+        pctx.moveTo(bx + r * 0.55, by);
+        pctx.lineTo(bx + r * 0.9, by + r * 0.35);
+        pctx.lineTo(bx + r * 1.5, by - r * 0.35);
+        pctx.stroke();
+      }
+    }
+
+    if (tpl.handle) {
+      pctx.font = `${handleFontSize * scaleF}px sans-serif`;
+      pctx.globalAlpha = tpl.handleOpacity ?? 0.6;
+      pctx.fillStyle = secondary;
+      pctx.fillText("@" + tpl.handle, infoX * scaleF, handleY * scaleF);
+      pctx.globalAlpha = 1;
+    }
+
+    if (titleLines.length) {
+      pctx.font = `bold ${titleFontSize * scaleF}px sans-serif`;
+      pctx.fillStyle = primary;
+      titleLines.forEach((line, i) => {
+        pctx.fillText(line, cardX * scaleF, (titleY + i * lineHeight) * scaleF);
+      });
+    }
+  }
+}
+
+function scheduleDraw() {
+  if (!previewVideo.videoWidth) drawPreview();
+}
+
+function loopDraw() {
+  drawPreview();
+  rafId = requestAnimationFrame(loopDraw);
+}
+
+previewVideo.addEventListener("loadedmetadata", () => scheduleDraw());
+
+document.querySelectorAll("#tplName, #tplHandle, #tplTitle, #pageBackground, #videoBoxAspect, #overlayText, #invert, #verified, #verifiedColor, #zoomScale, #centerOffsetY, #topMargin").forEach((el) => {
+  el.addEventListener("input", () => { if (!previewVideo.videoWidth) drawPreview(); });
+});
+drawPreview();
 
 $("exportTpl").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(currentTemplate(), null, 2)], { type: "application/json" });
