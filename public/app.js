@@ -93,7 +93,12 @@ function currentTemplate() {
     invert: $("invert").checked,
     name: $("tplName").value,
     handle: $("tplHandle").value,
+    handleOpacity: 0.6,
     title: $("tplTitle").value,
+    pageBackground: $("pageBackground").value,
+    videoBoxAspect: $("videoBoxAspect").value,
+    verified: $("verified").checked,
+    verifiedColor: $("verifiedColor").value,
     watermark: {
       enabled: $("wmEnabled").checked,
       position: $("wmPosition").value,
@@ -119,6 +124,10 @@ $("importTpl").addEventListener("change", async (e) => {
   $("tplName").value = tpl.name || "";
   $("tplHandle").value = tpl.handle || "";
   $("tplTitle").value = tpl.title || "";
+  $("pageBackground").value = tpl.pageBackground || "black";
+  $("videoBoxAspect").value = tpl.videoBoxAspect || "1:1";
+  $("verified").checked = !!tpl.verified;
+  $("verifiedColor").value = tpl.verifiedColor || "blue";
   if (tpl.watermark) {
     $("wmEnabled").checked = !!tpl.watermark.enabled;
     $("wmPosition").value = tpl.watermark.position || "bottom-right";
