@@ -1,7 +1,7 @@
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
 
-const ASSETS_DIR = path.join(__dirname, "..", "public", "assets");
+const ASSETS_DIR = path.join(__dirname, "..", "public");
 const CIRCLE_MASK = path.join(ASSETS_DIR, "circle-mask.png");
 const BADGES = {
   blue: path.join(ASSETS_DIR, "badge-blue.png"),
