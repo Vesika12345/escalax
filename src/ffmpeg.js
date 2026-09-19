@@ -164,13 +164,27 @@ async function processVideo({ inputVideo, logoPath, watermarkPath, template, out
       vcur = "vrot";
     }
 
+    const zoom = Math.min(2, Math.max(1, template.zoomScale || 1));
+    const scaleTargetW = Math.round(videoBoxW * zoom);
+    const scaleTargetH = Math.round(videoBoxH * zoom);
     filters.push({
       filter: "scale",
-      options: `${videoBoxW}:${videoBoxH}:force_original_aspect_ratio=increase`,
+      options: `${scaleTargetW}:${scaleTargetH}:force_original_aspect_ratio=increase`,
       inputs: vcur,
       outputs: "vscaled",
     });
-    filters.push({ filter: "crop", options: `${videoBoxW}:${videoBoxH}`, inputs: "vscaled", outputs: "vcropped" });
+
+    const maxOffset = Math.round((scaleTargetH - videoBoxH) / 2);
+    let offsetY = Math.round(template.centerOffsetY || 0);
+    offsetY = Math.max(-maxOffset, Math.min(maxOffset, offsetY));
+    const cropY = maxOffset + offsetY;
+
+    filters.push({
+      filter: "crop",
+      options: `${videoBoxW}:${videoBoxH}:(in_w-out_w)/2:${cropY}`,
+      inputs: "vscaled",
+      outputs: "vcropped",
+    });
     let vfinal = "vcropped";
 
     if (template.invert) {
