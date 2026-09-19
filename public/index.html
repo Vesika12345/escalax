@@ -14,6 +14,15 @@
 
   <main>
     <section class="card">
+      <h2>0. Preview</h2>
+      <div class="preview-wrap">
+        <canvas id="previewCanvas" width="270" height="480"></canvas>
+        <video id="previewVideo" muted loop playsinline style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
+      </div>
+      <p class="hint">Aproximado — o resultado final pode variar levemente.</p>
+    </section>
+
+    <section class="card">
       <h2>1. Template</h2>
       <div class="grid">
         <label>Nome (linha de cima)
@@ -58,6 +67,17 @@
             <option value="gold">Dourado</option>
             <option value="silver">Prata</option>
           </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>Zoom do vídeo
+          <input id="zoomScale" type="range" min="1" max="1.8" step="0.02" value="1" />
+        </label>
+        <label>Deslocar vídeo (cima/baixo)
+          <input id="centerOffsetY" type="range" min="-300" max="300" step="5" value="0" />
+        </label>
+        <label>Margem do topo
+          <input id="topMargin" type="range" min="60" max="260" step="5" value="130" />
         </label>
       </div>
       <div class="row">
