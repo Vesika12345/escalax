@@ -25,11 +25,25 @@
         <label class="full">Título (aparece sobre o vídeo)
           <input id="tplTitle" type="text" placeholder="Título do vídeo" />
         </label>
-        <label>Logo (PNG transparente)
+        <label>Logo / Avatar (PNG, vira circular)
           <input id="logoFile" type="file" accept="image/png" />
         </label>
         <label>Marca d'água (PNG transparente)
           <input id="wmFile" type="file" accept="image/png" />
+        </label>
+        <label>Fundo
+          <select id="pageBackground">
+            <option value="black">Preto</option>
+            <option value="white">Branco</option>
+            <option value="dim">Escuro azulado</option>
+          </select>
+        </label>
+        <label>Formato do vídeo
+          <select id="videoBoxAspect">
+            <option value="1:1">Quadrado (1:1)</option>
+            <option value="4:5">Retrato (4:5)</option>
+            <option value="16:9">Paisagem (16:9)</option>
+          </select>
         </label>
       </div>
 
@@ -37,6 +51,14 @@
         <label class="switch"><input id="overlayText" type="checkbox" checked /> Mostrar logo/nome/@/título</label>
         <label class="switch"><input id="invert" type="checkbox" /> Inverter vídeo (espelhar)</label>
         <label class="switch"><input id="wmEnabled" type="checkbox" /> Aplicar marca d'água em massa</label>
+        <label class="switch"><input id="verified" type="checkbox" /> Selo de verificado</label>
+        <label>Cor do selo
+          <select id="verifiedColor">
+            <option value="blue">Azul</option>
+            <option value="gold">Dourado</option>
+            <option value="silver">Prata</option>
+          </select>
+        </label>
       </div>
       <div class="row">
         <label>Posição da marca d'água
