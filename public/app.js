@@ -2,6 +2,7 @@ const state = {
   files: [],
   logoKey: null,
   wmKey: null,
+  templateBgKey: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -91,6 +92,8 @@ async function uploadAsset(fileInputId) {
   return presignAndUpload(input.files[0], () => {});
 }
 
+let boxXPct = 5, boxYPct = 40, boxWPct = 90, boxHPct = 45;
+
 function currentTemplate() {
   return {
     overlayText: $("overlayText").checked,
@@ -106,6 +109,7 @@ function currentTemplate() {
     zoomScale: parseFloat($("zoomScale").value),
     centerOffsetY: parseFloat($("centerOffsetY").value),
     topMargin: parseFloat($("topMargin").value),
+    boxXPct, boxYPct, boxWPct, boxHPct,
     watermark: {
       enabled: $("wmEnabled").checked,
       position: $("wmPosition").value,
@@ -114,13 +118,13 @@ function currentTemplate() {
   };
 }
 
-// ---------------- Preview (canvas) ----------------
 const CW = 1080, CH = 1920;
 const previewCanvas = $("previewCanvas");
 const pctx = previewCanvas.getContext("2d");
 const previewVideo = $("previewVideo");
 const scaleF = previewCanvas.width / CW;
 let avatarImg = null;
+let templateBgImg = null;
 let rafId = null;
 
 const BG_HEX = { black: "#000000", white: "#ffffff", dim: "#15202b" };
@@ -138,6 +142,14 @@ $("logoFile").addEventListener("change", (e) => {
   if (!f) { avatarImg = null; scheduleDraw(); return; }
   const img = new Image();
   img.onload = () => { avatarImg = img; scheduleDraw(); };
+  img.src = URL.createObjectURL(f);
+});
+
+$("templateBgFile").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (!f) { templateBgImg = null; scheduleDraw(); return; }
+  const img = new Image();
+  img.onload = () => { templateBgImg = img; scheduleDraw(); };
   img.src = URL.createObjectURL(f);
 });
 
@@ -159,15 +171,47 @@ function wrapLinesPreview(text, maxWidth, fontSize) {
   return lines.length ? lines : [""];
 }
 
+function drawVideoInBox(tpl, videoBoxX, videoBoxY, videoBoxW, videoBoxH) {
+  if (previewVideo.videoWidth) {
+    const zoom = Math.min(1.8, Math.max(1, tpl.zoomScale || 1));
+    const scaledW = videoBoxW * zoom, scaledH = videoBoxH * zoom;
+    const s = Math.max(scaledW / previewVideo.videoWidth, scaledH / previewVideo.videoHeight);
+    const svW = previewVideo.videoWidth * s, svH = previewVideo.videoHeight * s;
+    const maxOffset = (svH - videoBoxH) / 2;
+    const offsetY = Math.max(-maxOffset, Math.min(maxOffset, tpl.centerOffsetY || 0));
+    const cropY = maxOffset + offsetY;
+    const cropX = (svW - videoBoxW) / 2;
+    const sx = cropX / s, sy = cropY / s, sw = videoBoxW / s, sh = videoBoxH / s;
+    pctx.drawImage(
+      previewVideo, sx, sy, sw, sh,
+      videoBoxX * scaleF, videoBoxY * scaleF, videoBoxW * scaleF, videoBoxH * scaleF
+    );
+  } else {
+    pctx.fillStyle = "#111";
+    pctx.fillRect(videoBoxX * scaleF, videoBoxY * scaleF, videoBoxW * scaleF, videoBoxH * scaleF);
+  }
+}
+
 function drawPreview() {
   const tpl = currentTemplate();
   const isLight = tpl.pageBackground === "white";
   const primary = isLight ? "#0f1419" : "#f7f9f9";
   const secondary = isLight ? "#536471" : "#71767b";
+  const useCustomBg = !!templateBgImg;
 
   pctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-  pctx.fillStyle = BG_HEX[tpl.pageBackground] || "#000";
+  pctx.fillStyle = useCustomBg ? "#000" : (BG_HEX[tpl.pageBackground] || "#000");
   pctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+
+  if (useCustomBg) {
+    const videoBoxX = Math.round((CW * boxXPct) / 100);
+    const videoBoxY = Math.round((CH * boxYPct) / 100);
+    const videoBoxW = Math.round((CW * boxWPct) / 100);
+    const videoBoxH = Math.round((CH * boxHPct) / 100);
+    drawVideoInBox(tpl, videoBoxX, videoBoxY, videoBoxW, videoBoxH);
+    pctx.drawImage(templateBgImg, 0, 0, previewCanvas.width, previewCanvas.height);
+    return;
+  }
 
   const cardWidth = Math.round(CW * 0.92);
   const cardX = Math.round((CW - cardWidth) / 2);
@@ -201,24 +245,7 @@ function drawPreview() {
   else if (tpl.videoBoxAspect === "4:5") videoBoxH = Math.round(cardWidth * (5 / 4));
   else videoBoxH = cardWidth;
 
-  if (previewVideo.videoWidth) {
-    const zoom = Math.min(1.8, Math.max(1, tpl.zoomScale || 1));
-    const scaledW = videoBoxW * zoom, scaledH = videoBoxH * zoom;
-    const s = Math.max(scaledW / previewVideo.videoWidth, scaledH / previewVideo.videoHeight);
-    const svW = previewVideo.videoWidth * s, svH = previewVideo.videoHeight * s;
-    const maxOffset = (svH - videoBoxH) / 2;
-    const offsetY = Math.max(-maxOffset, Math.min(maxOffset, tpl.centerOffsetY || 0));
-    const cropY = maxOffset + offsetY;
-    const cropX = (svW - videoBoxW) / 2;
-    const sx = cropX / s, sy = cropY / s, sw = videoBoxW / s, sh = videoBoxH / s;
-    pctx.drawImage(
-      previewVideo, sx, sy, sw, sh,
-      videoBoxX * scaleF, videoBoxY * scaleF, videoBoxW * scaleF, videoBoxH * scaleF
-    );
-  } else {
-    pctx.fillStyle = "#111";
-    pctx.fillRect(videoBoxX * scaleF, videoBoxY * scaleF, videoBoxW * scaleF, videoBoxH * scaleF);
-  }
+  drawVideoInBox(tpl, videoBoxX, videoBoxY, videoBoxW, videoBoxH);
 
   if (showHeader) {
     if (hasAvatar) {
@@ -291,49 +318,81 @@ document.querySelectorAll("#tplName, #tplHandle, #tplTitle, #pageBackground, #vi
 });
 drawPreview();
 
-// ---------------- Interação por toque: arrastar pra reposicionar, pinça pra dar zoom ----------------
+let dragStartX = null;
 let dragStartY = null;
 let dragStartOffset = 0;
+let dragStartBoxX = 0;
+let dragStartBoxY = 0;
 let pinchStartDist = null;
 let pinchStartZoom = 1;
+let pinchStartBoxW = 0;
+let pinchStartBoxH = 0;
 
 function dist(t1, t2) {
   return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
 }
 
 previewCanvas.addEventListener("touchstart", (e) => {
+  const useCustomBg = !!templateBgImg;
   if (e.touches.length === 2) {
     pinchStartDist = dist(e.touches[0], e.touches[1]);
-    pinchStartZoom = parseFloat($("zoomScale").value);
+    if (useCustomBg) {
+      pinchStartBoxW = boxWPct;
+      pinchStartBoxH = boxHPct;
+    } else {
+      pinchStartZoom = parseFloat($("zoomScale").value);
+    }
     dragStartY = null;
   } else if (e.touches.length === 1) {
+    dragStartX = e.touches[0].clientX;
     dragStartY = e.touches[0].clientY;
-    dragStartOffset = parseFloat($("centerOffsetY").value);
+    if (useCustomBg) {
+      dragStartBoxX = boxXPct;
+      dragStartBoxY = boxYPct;
+    } else {
+      dragStartOffset = parseFloat($("centerOffsetY").value);
+    }
   }
   e.preventDefault();
 }, { passive: false });
 
 previewCanvas.addEventListener("touchmove", (e) => {
+  const useCustomBg = !!templateBgImg;
   if (e.touches.length === 2 && pinchStartDist) {
     const d = dist(e.touches[0], e.touches[1]);
     const factor = d / pinchStartDist;
-    let z = Math.min(1.8, Math.max(1, pinchStartZoom * factor));
-    z = Math.round(z * 50) / 50;
-    $("zoomScale").value = z;
+    if (useCustomBg) {
+      boxWPct = Math.max(10, Math.min(100, Math.round(pinchStartBoxW * factor)));
+      boxHPct = Math.max(10, Math.min(100, Math.round(pinchStartBoxH * factor)));
+    } else {
+      let z = Math.min(1.8, Math.max(1, pinchStartZoom * factor));
+      z = Math.round(z * 50) / 50;
+      $("zoomScale").value = z;
+    }
     drawPreview();
   } else if (e.touches.length === 1 && dragStartY !== null) {
-    const deltaScreen = e.touches[0].clientY - dragStartY;
-    const deltaCanvasPx = deltaScreen * (previewCanvas.width / previewCanvas.clientWidth);
-    const delta1080 = deltaCanvasPx / scaleF;
-    let off = Math.round((dragStartOffset - delta1080) / 5) * 5;
-    off = Math.max(-300, Math.min(300, off));
-    $("centerOffsetY").value = off;
+    const deltaScreenY = e.touches[0].clientY - dragStartY;
+    const deltaCanvasPxY = deltaScreenY * (previewCanvas.height / previewCanvas.clientHeight);
+    if (useCustomBg) {
+      const deltaScreenX = e.touches[0].clientX - dragStartX;
+      const deltaCanvasPxX = deltaScreenX * (previewCanvas.width / previewCanvas.clientWidth);
+      const deltaPctX = (deltaCanvasPxX / scaleF / CW) * 100;
+      const deltaPctY = (deltaCanvasPxY / scaleF / CH) * 100;
+      boxXPct = Math.max(0, Math.min(100 - boxWPct, dragStartBoxX + deltaPctX));
+      boxYPct = Math.max(0, Math.min(100 - boxHPct, dragStartBoxY + deltaPctY));
+    } else {
+      const delta1080 = deltaCanvasPxY / scaleF;
+      let off = Math.round((dragStartOffset - delta1080) / 5) * 5;
+      off = Math.max(-300, Math.min(300, off));
+      $("centerOffsetY").value = off;
+    }
     drawPreview();
   }
   e.preventDefault();
 }, { passive: false });
 
 previewCanvas.addEventListener("touchend", () => {
+  dragStartX = null;
   dragStartY = null;
   pinchStartDist = null;
 });
@@ -362,6 +421,10 @@ $("importTpl").addEventListener("change", async (e) => {
   $("zoomScale").value = tpl.zoomScale ?? 1;
   $("centerOffsetY").value = tpl.centerOffsetY ?? 0;
   $("topMargin").value = tpl.topMargin ?? 130;
+  boxXPct = tpl.boxXPct ?? 5;
+  boxYPct = tpl.boxYPct ?? 40;
+  boxWPct = tpl.boxWPct ?? 90;
+  boxHPct = tpl.boxHPct ?? 45;
   if (tpl.watermark) {
     $("wmEnabled").checked = !!tpl.watermark.enabled;
     $("wmPosition").value = tpl.watermark.position || "bottom-right";
@@ -375,6 +438,7 @@ $("processBtn").addEventListener("click", async () => {
   try {
     state.logoKey = await uploadAsset("logoFile");
     state.wmKey = await uploadAsset("wmFile");
+    state.templateBgKey = await uploadAsset("templateBgFile");
 
     await runWithLimit(
       state.files.map((item) => async () => {
@@ -405,6 +469,7 @@ $("processBtn").addEventListener("click", async () => {
         template: currentTemplate(),
         logoKey: state.logoKey,
         watermarkKey: state.wmKey,
+        templateBgKey: state.templateBgKey,
       }),
     });
     if (!r.ok) throw new Error("falha ao criar os jobs de processamento");
