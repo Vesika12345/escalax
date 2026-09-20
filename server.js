@@ -37,6 +37,7 @@ app.post("/api/jobs", (req, res) => {
         template: template || {},
         logoKey,
         watermarkKey,
+        templateBgKey,
       })
     );
     res.json({ jobIds });
