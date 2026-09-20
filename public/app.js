@@ -291,6 +291,53 @@ document.querySelectorAll("#tplName, #tplHandle, #tplTitle, #pageBackground, #vi
 });
 drawPreview();
 
+// ---------------- Interação por toque: arrastar pra reposicionar, pinça pra dar zoom ----------------
+let dragStartY = null;
+let dragStartOffset = 0;
+let pinchStartDist = null;
+let pinchStartZoom = 1;
+
+function dist(t1, t2) {
+  return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+}
+
+previewCanvas.addEventListener("touchstart", (e) => {
+  if (e.touches.length === 2) {
+    pinchStartDist = dist(e.touches[0], e.touches[1]);
+    pinchStartZoom = parseFloat($("zoomScale").value);
+    dragStartY = null;
+  } else if (e.touches.length === 1) {
+    dragStartY = e.touches[0].clientY;
+    dragStartOffset = parseFloat($("centerOffsetY").value);
+  }
+  e.preventDefault();
+}, { passive: false });
+
+previewCanvas.addEventListener("touchmove", (e) => {
+  if (e.touches.length === 2 && pinchStartDist) {
+    const d = dist(e.touches[0], e.touches[1]);
+    const factor = d / pinchStartDist;
+    let z = Math.min(1.8, Math.max(1, pinchStartZoom * factor));
+    z = Math.round(z * 50) / 50;
+    $("zoomScale").value = z;
+    drawPreview();
+  } else if (e.touches.length === 1 && dragStartY !== null) {
+    const deltaScreen = e.touches[0].clientY - dragStartY;
+    const deltaCanvasPx = deltaScreen * (previewCanvas.width / previewCanvas.clientWidth);
+    const delta1080 = deltaCanvasPx / scaleF;
+    let off = Math.round((dragStartOffset - delta1080) / 5) * 5;
+    off = Math.max(-300, Math.min(300, off));
+    $("centerOffsetY").value = off;
+    drawPreview();
+  }
+  e.preventDefault();
+}, { passive: false });
+
+previewCanvas.addEventListener("touchend", () => {
+  dragStartY = null;
+  pinchStartDist = null;
+});
+
 $("exportTpl").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(currentTemplate(), null, 2)], { type: "application/json" });
   const a = document.createElement("a");
@@ -312,11 +359,15 @@ $("importTpl").addEventListener("change", async (e) => {
   $("videoBoxAspect").value = tpl.videoBoxAspect || "1:1";
   $("verified").checked = !!tpl.verified;
   $("verifiedColor").value = tpl.verifiedColor || "blue";
+  $("zoomScale").value = tpl.zoomScale ?? 1;
+  $("centerOffsetY").value = tpl.centerOffsetY ?? 0;
+  $("topMargin").value = tpl.topMargin ?? 130;
   if (tpl.watermark) {
     $("wmEnabled").checked = !!tpl.watermark.enabled;
     $("wmPosition").value = tpl.watermark.position || "bottom-right";
     $("wmOpacity").value = tpl.watermark.opacity ?? 0.6;
   }
+  drawPreview();
 });
 
 $("processBtn").addEventListener("click", async () => {
