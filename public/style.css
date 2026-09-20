@@ -26,6 +26,6 @@ button:disabled { background: #333; cursor: not-allowed; }
 .status a { color: #6c5ce7; }
 .status.error { color: #ff6b6b; }
 .preview-wrap { display: flex; justify-content: center; position: relative; }
-.preview-wrap canvas { width: 100%; max-width: 270px; border-radius: 12px; background: #000; }
+.preview-wrap canvas { width: 100%; max-width: 270px; border-radius: 12px; background: #000; touch-action: none; }
 .hint { color: #666; font-size: 11px; text-align: center; margin: 6px 0 0; }
 input[type=range] { width: 100%; }
