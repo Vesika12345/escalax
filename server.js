@@ -28,7 +28,7 @@ app.post("/api/presign-upload", async (req, res) => {
 // 2) cria os jobs de processamento em massa (um por vídeo)
 app.post("/api/jobs", (req, res) => {
   try {
-    const { videos, template, logoKey, watermarkKey } = req.body;
+    const { videos, template, logoKey, watermarkKey, templateBgKey } = req.body;
     // videos: [{ key, filename }]
     const jobIds = videos.map((v) =>
       createJob({
