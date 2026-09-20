@@ -19,7 +19,7 @@
         <canvas id="previewCanvas" width="270" height="480"></canvas>
         <video id="previewVideo" muted loop playsinline style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
       </div>
-      <p class="hint">Arraste o vídeo pra reposicionar e use dois dedos pra dar zoom. Aproximado — o resultado final pode variar levemente.</p>
+      <p class="hint">Arraste pra mover e use dois dedos pra dar zoom/redimensionar. Se você subir um template pronto (PNG do Canva), os campos de nome/@/título/fundo abaixo são ignorados — o vídeo só se encaixa no espaço do seu design.</p>
     </section>
 
     <section class="card">
@@ -39,6 +39,9 @@
         </label>
         <label>Marca d'água (PNG transparente)
           <input id="wmFile" type="file" accept="image/png" />
+        </label>
+        <label class="full">Template de fundo pronto (PNG do Canva, com um espaço vazio/transparente onde o vídeo entra)
+          <input id="templateBgFile" type="file" accept="image/png,image/jpeg" />
         </label>
         <label>Fundo
           <select id="pageBackground">
