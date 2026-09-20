@@ -11,7 +11,7 @@ const TMP_DIR = process.env.TMP_DIR || os.tmpdir();
 
 const jobs = new Map();
 
-function createJob({ sourceKey, filename, template, logoKey, watermarkKey }) {
+function createJob({ sourceKey, filename, template, logoKey, watermarkKey, templateBgKey }) {
   const id = nanoid(10);
   jobs.set(id, {
     id,
@@ -22,12 +22,12 @@ function createJob({ sourceKey, filename, template, logoKey, watermarkKey }) {
     filename,
   });
 
-  limit(() => runJob(id, { sourceKey, filename, template, logoKey, watermarkKey })).catch(() => {});
+  limit(() => runJob(id, { sourceKey, filename, template, logoKey, watermarkKey, templateBgKey })).catch(() => {});
 
   return id;
 }
 
-async function runJob(id, { sourceKey, filename, template, logoKey, watermarkKey }) {
+async function runJob(id, { sourceKey, filename, template, logoKey, watermarkKey, templateBgKey }) {
   const job = jobs.get(id);
   const workDir = path.join(TMP_DIR, id);
   fs.mkdirSync(workDir, { recursive: true });
@@ -36,18 +36,21 @@ async function runJob(id, { sourceKey, filename, template, logoKey, watermarkKey
   const outputPath = path.join(workDir, "output.mp4");
   const logoPath = logoKey ? path.join(workDir, "logo.png") : null;
   const wmPath = watermarkKey ? path.join(workDir, "watermark.png") : null;
+  const templateBgPath = templateBgKey ? path.join(workDir, "template-bg.png") : null;
 
   try {
     job.status = "downloading";
     await downloadToFile(sourceKey, inputPath);
     if (logoKey) await downloadToFile(logoKey, logoPath);
     if (watermarkKey) await downloadToFile(watermarkKey, wmPath);
+    if (templateBgKey) await downloadToFile(templateBgKey, templateBgPath);
 
     job.status = "processing";
     await processVideo({
       inputVideo: inputPath,
       logoPath,
       watermarkPath: wmPath,
+      templateBgPath,
       template,
       outputPath,
       onProgress: (percent) => {
